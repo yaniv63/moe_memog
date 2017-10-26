@@ -15,6 +15,8 @@ from load_data import split_data,get_fold_samples
 from evaluate_model import eval_model
 from sklearn.metrics import accuracy_score,f1_score,confusion_matrix
 import itertools
+from pympler.tracker import SummaryTracker
+tracker = SummaryTracker()
 
 run_dir = get_run_dir()
 
@@ -32,7 +34,7 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
     logger.info("index {}".format(params_index))
 
     scale_data = False
-    fit_params_dict = {'batch_size':16,'epochs':current_params['epoch_num'],'validation_split':0.0,'verbose':1}
+    fit_params_dict = {'batch_size':16,'epochs':current_params['epoch_num'],'validation_split':0.0,'verbose':0}
     kfold_params_dict = {'n_splits':10, 'shuffle':False, 'random_state':42}
 
     logger.info("scale data {}".format(scale_data))
@@ -121,4 +123,7 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
         res = "_{}_acc_{:.4f}_f1_{:.4f}-x-".format(k,v['acc'],v['f1'])
         folder_name += res
     os.rename(params_dir,run_dir +folder_name)
+    tracker.print_diff()
+
+
 

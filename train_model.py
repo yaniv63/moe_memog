@@ -1,6 +1,6 @@
 from keras.models import Model
 import logging
-from utils.plotting_tools import plot_training
+#from utils.plotting_tools import plot_training
 from train_tools import create_callbacks
 from load_data import split_data,get_fold_samples
 from utils.params import callbacks_params
@@ -34,6 +34,6 @@ def train_phase(model, data, target, name, fit_params_dict, data_split_indexes,i
         logs.append(history.history)
         logger.info("finished fold {}".format(i))
 
-    plot_training(logs,name,save_path)
+    #plot_training(logs,name,save_path)
     # with open(save_path + 'cross_valid_stats_{}.lst'.format(name), 'wb') as fp:
     #     pickle.dump(logs, fp)

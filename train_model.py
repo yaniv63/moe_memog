@@ -34,6 +34,6 @@ def train_phase(model, data, target, name, fit_params_dict, data_split_indexes,i
         logs.append(history.history)
         logger.info("finished fold {}".format(i))
 
-    plot_training(logs,name,save_path)
+    #plot_training(logs,name,save_path)
     # with open(save_path + 'cross_valid_stats_{}.lst'.format(name), 'wb') as fp:
     #     pickle.dump(logs, fp)

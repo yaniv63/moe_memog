@@ -5,7 +5,7 @@ from collections import defaultdict
 from keras.optimizers import SGD
 from load_data import load_medical_data,scale_data_normlize
 # from exception_handler import *
-from multi_predictors_combined import expert_model,n_parameters_combined_model,n_experts_combined_model,simple_model,n_experts_combined_model_gate_parameters
+from multi_predictors_combined import expert_model,n_experts_combined_model,simple_model
 from train_model import train_phase
 from utils.funcs import merge_dicts
 from utils.logging_tools import get_logger
@@ -13,7 +13,7 @@ from utils.paths import *
 from sklearn.model_selection import KFold
 from load_data import split_data,get_fold_samples
 from evaluate_model import eval_model
-from sklearn.metrics import accuracy_score,f1_score,confusion_matrix
+from sklearn.metrics import accuracy_score,f1_score
 import itertools
 
 run_dir = get_run_dir()
@@ -50,42 +50,35 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
     logger.info("data type {}".format(data_type[type_v]))
 
     kf = KFold(**kfold_params_dict)
-    from utils.metrices import fmeasure
     ## train
     experts = {}
     experts_split_indexes =split_data(data['CC'],is_multi_expert=False,kfold=kf)
     print "train experts"
     for i, view in enumerate(data_view):
-        from utils.metrices import fmeasure
         expert = expert_model(input_shape=(feature_number,), index=view,params=current_params)
-        #optimizer = SGD(lr=0.01, nesterov=True,momentum=0.9)
-        expert.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy', metrics=['accuracy', fmeasure])
+        expert.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy', metrics=['accuracy'])#, fmeasure])
         train_phase(expert, data[view], target, view, fit_params_dict, experts_split_indexes,False,params_dir)
         experts[view] = expert
 
     s_model = simple_model(params=current_params)
     s_data = np.concatenate((data['CC'], data['MLO']), axis=1)
-    #optimizer = SGD(lr=0.01, nesterov=True,momentum=0.9)
-    s_model.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy', metrics=['accuracy', fmeasure])
+    s_model.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy', metrics=['accuracy'])#, fmeasure])
     train_phase(s_model, s_data, target, 'simple_model', fit_params_dict, experts_split_indexes, False,params_dir)
 
     print "train combined models"
     combined_split_indexes =split_data(data,is_multi_expert=True,kfold=kf)
 
     moe_vectors = n_experts_combined_model(input_shape=(feature_number,), n=2,params =current_params)
-    # moe_parameters = n_experts_combined_model_gate_parameters(input_shape=(feature_number,), n=2)
-    # parameters_model = n_parameters_combined_model(input_shape=(feature_number,),n=2)
-    combined_models = {'MOE': moe_vectors}#, 'parameters_model': parameters_model,'moe_parameters':moe_parameters}
+    combined_models = {'MOE': moe_vectors}
     for model_name,model in combined_models.items():
         optimizer = SGD(lr=0.1, decay=1e-5, nesterov=True)
-        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy', fmeasure])
+        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])#, fmeasure])
         train_phase(model,data,target,model_name,fit_params_dict,combined_split_indexes,True,params_dir)
 
-    #predictors = merge_dicts(experts, combined_models)
 
     ## evaluate
     print "evaluate models"
-    metrics = [accuracy_score,f1_score,confusion_matrix]
+    metrics = [accuracy_score,f1_score]
     scores = defaultdict(dict)
     def check_model(model,model_name,data,target,metrics,indexes,is_multi_expert):
         results_acc = []

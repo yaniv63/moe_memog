@@ -36,7 +36,7 @@ def generic_plot(kwargs):
         plt.savefig(kwargs["save_file"],dpi=100)
 
 def plot_training(logs,name,save_path):
-    metrics = ['acc', 'val_acc', 'loss', 'val_loss', 'fmeasure', 'val_fmeasure']
+    metrics = ['acc', 'val_acc', 'loss', 'val_loss']#, 'fmeasure', 'val_fmeasure']
     linestyles = ['-', '--']
     colors = ['b','y','r','g','c','m','k',[.80, .19, .46],[.61, .51, .74],[.31, .87, .56]]
     for j,history in enumerate(logs):

@@ -70,7 +70,7 @@ def n_parameters_combined_model(input_shape,n=2):
 
 
 
-def n_experts_combined_model(input_shape, n=2,params={}):
+def n_experts_combined_model(input_shape,params, n=2):
     decisions = []
     denses = []
     denses2 = []

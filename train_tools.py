@@ -12,13 +12,17 @@ logger = logging.getLogger('root')
 
 def create_callbacks(name,fold,callbacks_params,save_path):
     save_weights = ModelCheckpoint(filepath=save_path + 'model_{}_fold_{}.h5'.format(name, fold), **callbacks_params['ModelCheckpoint'])
+
     print_logs = LambdaCallback(on_epoch_end=lambda epoch, logs:
     logger.debug("epoch {} loss {:.5f} acc {:.5f} fmeasure  ".
                  format(epoch, logs['loss'], logs['acc'])))#, logs['fmeasure'])))
-    #reducelr = ReduceLR(name,fold,0.8,patience=15,save_path=save_path)
+
+    # #reducelr = ReduceLR(name,fold,0.8,patience=15,save_path=save_path)
     early_stop = EarlyStopping(**callbacks_params['earlystop'])
+
     reduce_lr = ReduceLROnPlateau(**callbacks_params['ReduceLROnPlateau'])
-    mycallbacks = [print_logs,save_weights,early_stop,reduce_lr] #reducelr
+    mycallbacks = [save_weights,print_logs,early_stop,reduce_lr] #reducelr
+
     return mycallbacks
 
 

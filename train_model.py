@@ -30,7 +30,8 @@ def train_phase(model, data, target, name, fit_params_dict, data_split_indexes,i
         logger.info("training expert {}".format(name))
         load_weights_for_fold(model,init_w,is_multi_expert,fold=i,path = save_path)
         callbacks = create_callbacks(name=name,fold=i,callbacks_params=callbacks_params,save_path=save_path)
-        history = model.fit(X_train,y_train,callbacks= callbacks,**fit_params_dict)
+        history = model.fit(X_train,y_train,callbacks=callbacks,**fit_params_dict)
+        #model.save_weights(save_path + "model_{}_fold_{}.h5".format(name,i))
         logs.append(history.history)
         logger.info("finished fold {}".format(i))
 

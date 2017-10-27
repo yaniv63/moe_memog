@@ -5,7 +5,7 @@ from collections import defaultdict
 from keras.optimizers import SGD
 from load_data import load_medical_data,scale_data_normlize
 # from exception_handler import *
-from multi_predictors_combined import expert_model,n_experts_combined_model,simple_model
+from multi_predictors_combined import expert_model,simple_model,n_experts_combined_model_b
 from train_model import train_phase
 from utils.funcs import merge_dicts
 from utils.logging_tools import get_logger
@@ -16,6 +16,8 @@ from evaluate_model import eval_model
 from sklearn.metrics import accuracy_score,f1_score
 import itertools
 from pympler.tracker import SummaryTracker
+import gc
+#gc.set_debug(gc.DEBUG_LEAK)
 tracker = SummaryTracker()
 
 run_dir = get_run_dir()
@@ -25,6 +27,7 @@ from utils.params import callbacks_params,params
 
 keys = list(params)
 for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
+    tracker.print_diff()
     current_params =  dict(zip(keys, values))
     np.random.seed(42)
     params_dir = run_dir + str(params_index) +'/'
@@ -70,7 +73,7 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
     print "train combined models"
     combined_split_indexes =split_data(data,is_multi_expert=True,kfold=kf)
 
-    moe_vectors = n_experts_combined_model(input_shape=(feature_number,), n=2,params =current_params)
+    moe_vectors = n_experts_combined_model_b(input_shape=(feature_number,), n=2,params =current_params)
     combined_models = {'MOE': moe_vectors}
     for model_name,model in combined_models.items():
         optimizer = SGD(lr=0.1, decay=1e-5, nesterov=True)
@@ -116,7 +119,10 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
         res = "_{}_acc_{:.4f}_f1_{:.4f}-x-".format(k,v['acc'],v['f1'])
         folder_name += res
     os.rename(params_dir,run_dir +folder_name)
-    tracker.print_diff()
+    del experts
+    del moe_vectors
+    gc.collect()
+
 
 
 

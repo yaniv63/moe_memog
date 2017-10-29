@@ -2,7 +2,6 @@ import numpy as np
 np.random.seed(42)
 import os
 from collections import defaultdict
-from keras.optimizers import SGD
 from load_data import load_medical_data,scale_data_normlize
 # from exception_handler import *
 from multi_predictors_combined import expert_model,simple_model,n_experts_combined_model_b
@@ -24,6 +23,7 @@ run_dir = get_run_dir()
 
 ## parameters
 from utils.params import callbacks_params,params
+
 
 keys = list(params)
 for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
@@ -65,10 +65,6 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
         train_phase(expert, data[view], target, view, fit_params_dict, experts_split_indexes,False,params_dir)
         experts[view] = expert
 
-    s_model = simple_model(params=current_params)
-    s_data = np.concatenate((data['CC'], data['MLO']), axis=1)
-    s_model.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy', metrics=['accuracy'])#, fmeasure])
-    train_phase(s_model, s_data, target, 'simple_model', fit_params_dict, experts_split_indexes, False,params_dir)
 
     print "train combined models"
     combined_split_indexes =split_data(data,is_multi_expert=True,kfold=kf)
@@ -76,10 +72,15 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
     moe_vectors = n_experts_combined_model_b(input_shape=(feature_number,), n=2,params =current_params)
     combined_models = {'MOE': moe_vectors}
     for model_name,model in combined_models.items():
-        optimizer = SGD(lr=0.1, decay=1e-5, nesterov=True)
-        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])#, fmeasure])
+        model.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy', metrics=['accuracy'])#, fmeasure])
         train_phase(model,data,target,model_name,fit_params_dict,combined_split_indexes,True,params_dir)
 
+    print "train simple model"
+    s_model = simple_model(params=current_params)
+    s_data = np.concatenate((data['CC'], data['MLO']), axis=1)
+    s_model.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy',
+                    metrics=['accuracy'])  # , fmeasure])
+    train_phase(s_model, s_data, target, 'simple_model', fit_params_dict, experts_split_indexes, False, params_dir)
 
     ## evaluate
     print "evaluate models"
@@ -107,12 +108,13 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
         a,f1 = check_model(model,model_name,data[model_name],target,metrics,experts_split_indexes,False)
         scores[model_name] = {'acc':a,'f1':f1}
 
-    a, f1 = check_model(s_model,'simple_model',s_data,target,metrics,experts_split_indexes,False)
-    scores['SIMPLE'] = {'acc': a, 'f1': f1}
-
     for model_name,model in combined_models.items():
         a, f1 = check_model(model,model_name,data,target,metrics,combined_split_indexes,True)
         scores[model_name] = {'acc':a,'f1':f1}
+
+    a, f1 = check_model(s_model,'simple_model',s_data,target,metrics,experts_split_indexes,False)
+    scores['SIMPLE'] = {'acc': a, 'f1': f1}
+
 
     folder_name=str(params_index)
     for k, v in scores.items():

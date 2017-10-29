@@ -12,9 +12,9 @@ logger = logging.getLogger('root')
 
 def load_weights_for_fold(model,init_w,is_multi_expert,fold,path):
     model.set_weights(init_w)
-    if is_multi_expert:
-        model.load_weights(path +"model_CC_fold_{}.h5".format(fold),by_name=True)
-        model.load_weights(path +"model_MLO_fold_{}.h5".format(fold),by_name=True)
+    # if is_multi_expert:
+    #     model.load_weights(path +"model_CC_fold_{}.h5".format(fold),by_name=True)
+    #     model.load_weights(path +"model_MLO_fold_{}.h5".format(fold),by_name=True)
 
 
 

@@ -29,13 +29,12 @@ keys = list(params)
 for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
     tracker.print_diff()
     current_params =  dict(zip(keys, values))
-    np.random.seed(42)
     params_dir = run_dir + str(params_index) +'/'
     makedirs(params_dir)
     logger = get_logger(params_dir)
     logger.info("{}".format(current_params))
     logger.info("index {}".format(params_index))
-
+    check_seed = 42
     scale_data = False
     fit_params_dict = {'batch_size':16,'epochs':current_params['epoch_num'],'validation_split':0.0,'verbose':0}
     kfold_params_dict = {'n_splits':10, 'shuffle':False, 'random_state':42}
@@ -60,15 +59,17 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
     experts_split_indexes =split_data(data['CC'],is_multi_expert=False,kfold=kf)
     print "train experts"
     for i, view in enumerate(data_view):
+        np.random.seed(check_seed)
         expert = expert_model(input_shape=(feature_number,), index=view,params=current_params)
         expert.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy', metrics=['accuracy'])#, fmeasure])
         train_phase(expert, data[view], target, view, fit_params_dict, experts_split_indexes,False,params_dir)
         experts[view] = expert
 
 
+
     print "train combined models"
     combined_split_indexes =split_data(data,is_multi_expert=True,kfold=kf)
-
+    np.random.seed(check_seed)
     moe_vectors = n_experts_combined_model_b(input_shape=(feature_number,), n=2,params =current_params)
     combined_models = {'MOE': moe_vectors}
     for model_name,model in combined_models.items():
@@ -76,6 +77,7 @@ for params_index,values in enumerate(itertools.product(*map(params.get, keys))):
         train_phase(model,data,target,model_name,fit_params_dict,combined_split_indexes,True,params_dir)
 
     print "train simple model"
+    np.random.seed(check_seed)
     s_model = simple_model(params=current_params)
     s_data = np.concatenate((data['CC'], data['MLO']), axis=1)
     s_model.compile(optimizer=current_params['optimizer'], loss='binary_crossentropy',

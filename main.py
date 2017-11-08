@@ -8,7 +8,7 @@ import copy
 from eval_model import EvalModel
 from collections import defaultdict
 from sklearn.metrics import accuracy_score,f1_score
-
+from utils.plotting_tools import PlotHandler
 
 run_dir = get_run_dir()
 ## data
@@ -31,7 +31,7 @@ baseline_params = {'nn_layer1' : 24, 'nn_layer2' : 24,
 moe_params = { 'nn_layer1' : 24, 'nn_layer2' : 24,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform','nn_gate1' : 3,'nn_gate2':3}
 multi_moe_params =copy.copy(fit_params_dict)
-multi_moe_params['loss_weights'] = [1,0.2,0.2]
+multi_moe_params['loss_weights'] = [1,1,1]
 expert_num =2
 ## helping objects
 metrics = {'acc':accuracy_score,'f1':f1_score}
@@ -94,10 +94,18 @@ basemodels = create_model_by_data(concat_data, target, BaseLineModel, "baseline"
 moe_model = create_model_by_data(concat_data,target,MOE,"moe",moe_params,callbacks_params,fit_params_dict,eval_m,run_dir,{'expert_num':expert_num})
 multilabel_moe = create_model_by_data(concat_data,target,MultilabelMOE,"multilabel_moe",moe_params,callbacks_params,multi_moe_params,eval_m,run_dir,{'expert_num':expert_num})
 models = {}
-#models.update(experts)
-#models["baseline"]=basemodels
-#models["moe"] = moe_model
+models.update(experts)
+models["baseline"]=basemodels
+models["moe"] = moe_model
 models['multilabel'] = multilabel_moe
+
+
+## plot handlers
+plot_handlers = {}
+plot_metrics  = ['loss','acc']
+for model_name in ['CC','MLO','baseline','moe']:
+    plot_handlers[model_name] = PlotHandler(models[model_name].values(), run_dir, plot_metrics)
+plot_handlers['multilabel'] = PlotHandler(models['multilabel'].values(), run_dir, ['loss','main_output_acc','exp0_output_acc','exp1_output_acc'])
 
 ## train & eval
 
@@ -116,12 +124,13 @@ for seed in range(init_seed,init_seed+seed_num):
             model.eval_model()
             seed_results[model_type][model.name] = model.eval_results
 
-    #seed_results['avg'] = avg_experts(experts, data_view, nb_splits)
+    seed_results['avg'] = avg_experts(experts, data_view, nb_splits)
     for model in models.keys()+['avg']:
         avg = avg_result(seed_results[model], metrics)
-        # for k, v in avg.items():
-        #     print "{} {}    {:.5f} (+/- {:.5f})".format(model, k, v['mean'], v['std'])
         total_results[model].append(avg)
+    for k,v in plot_handlers.items():
+        plot_handlers[k].plot_metrics()
+
 
 print "\n total avg performance: \n"
 for model in models.keys()+['avg']:

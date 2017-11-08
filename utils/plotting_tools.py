@@ -61,11 +61,12 @@ class PlotHandler(object):
         self.save_path = save_path
         self.metrics = metrics
 
-    def plot_metric(self):
+    def plot_metrics(self):
         for metric in self.metrics:
             for i,model in enumerate(self.models):
                 history = model.get_history(metric)
-                self._plot_model(history,metric,model.name,i)
+                type = model.type + '_seed_' + str(model.seed)
+                self._plot_model(history,metric,type,i)
         plt.close('all')
 
     def _plot_model(self,history,metric,name,color_num):
@@ -75,4 +76,3 @@ class PlotHandler(object):
                   'save_file': self.save_path + 'model_{}_'.format(name) + metric + '.png'}
         generic_plot(params)
 
-    #TODO : add creation in main;add in model return metric and name "cc"

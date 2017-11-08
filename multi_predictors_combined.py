@@ -163,21 +163,45 @@ def n_experts_combined_model_b(input_shape,params, n=2):
     d2 =  Dropout(rate=params['dropout2'])(gate_dense2)
     coefficients = Dense(n, activation='softmax', name='out_gate', kernel_initializer=params['w_init'])(d2)
 
-    weighted_prediction = dot([coefficients, merged_decisions],axes=1)
+    weighted_prediction = dot([coefficients, merged_decisions],axes=1,name='main_output')
     model = Model(inputs=data, outputs=weighted_prediction)
     return model
 
 
-params = {
-    'optimizer' : 'adam',
-    'nn_layer1' : 24,
-    'nn_layer2' : 24,
-    'dropout1' : 0.8,
-    'dropout2': 0.8,
-    'epoch_num' : 500,
-    'w_init' : 'glorot_uniform',
-    'nn_gate' : 10
-}
-a = n_experts_combined_model_b(params=params,input_shape=14)
-from keras.utils import plot_model
-plot_model(a,to_file='n_experts_combined_model_b.png',show_layer_names=True,show_shapes=True)
+
+def check_params_model(input_shape,params, n=2):
+    model = n_experts_combined_model_b(input_shape,params, n)
+    check_model = Model(
+        inputs=model.inputs,
+        outputs=[ model.output,
+                  model.get_layer('out_gate').output,
+                  model.get_layer('exp0_output').output,
+                  model.get_layer('exp1_output').output
+                  ]
+    )
+    return check_model
+
+def multilabel_model(input_shape,params, n=2):
+    model = n_experts_combined_model_b(input_shape,params, n)
+    multilabel = Model(
+        inputs=model.inputs,
+        outputs=[model.output,
+                 model.get_layer('exp0_output').output,
+                 model.get_layer('exp1_output').output
+                 ]
+    )
+    return multilabel
+
+# params = {
+#     'optimizer' : 'adam',
+#     'nn_layer1' : 24,
+#     'nn_layer2' : 24,
+#     'dropout1' : 0.8,
+#     'dropout2': 0.8,
+#     'epoch_num' : 500,
+#     'w_init' : 'glorot_uniform',
+#     'nn_gate' : 10
+# }
+# a = n_experts_combined_model_b(params=params,input_shape=14)
+# from keras.utils import plot_model
+# plot_model(a,to_file='n_experts_combined_model_b.png',show_layer_names=True,show_shapes=True)

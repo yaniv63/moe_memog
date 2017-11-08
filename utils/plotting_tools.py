@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 import matplotlib
+
 #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pylab import rcParams
@@ -51,3 +52,27 @@ def plot_training(logs,name,save_path):
                   'save_file': save_path + 'model_{}_'.format(name) + metrics[i] + '.png'}
         generic_plot(params)
     plt.close('all')
+
+
+class PlotHandler(object):
+    def __init__(self,models,save_path,metrics):
+        self.models = models
+        self.colors = ['b','y','r','g','c','m','k',[.80, .19, .46],[.61, .51, .74],[.31, .87, .56]]
+        self.save_path = save_path
+        self.metrics = metrics
+
+    def plot_metric(self):
+        for metric in self.metrics:
+            for i,model in enumerate(self.models):
+                history = model.get_history(metric)
+                self._plot_model(history,metric,model.name,i)
+        plt.close('all')
+
+    def _plot_model(self,history,metric,name,color_num):
+        linestyles = ['-', '--']
+        params = {'figure_name': metric+'_'+name, 'y':history,'title':'model_{} '.format(name) + metric,
+                  'ylabel':metric,'xlabel':'epoch',"line_att":dict(linestyle=linestyles[0],color=self.colors[color_num]),
+                  'save_file': self.save_path + 'model_{}_'.format(name) + metric + '.png'}
+        generic_plot(params)
+
+    #TODO : add creation in main;add in model return metric and name "cc"

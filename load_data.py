@@ -17,11 +17,11 @@ def load_medical_data(data_view='Dense', set_type ='Both'):
         data = {'CC': dataCC,'MLO': dataMLO }
     return data,target
 
-def split_data(data,is_multi_expert,kfold):
+def split_data(data,target,is_multi_expert,kfold):
     if is_multi_expert:
-        data_split  = list(kfold.split(data['MLO']))
+        data_split  = list(kfold.split(data['MLO'],target))
     else:
-        data_split = list(kfold.split(data))
+        data_split = list(kfold.split(data,target))
 
     return data_split
 

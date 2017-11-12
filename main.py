@@ -131,6 +131,11 @@ for seed in range(init_seed,init_seed+seed_num):
     for k,v in plot_handlers.items():
         plot_handlers[k].plot_metrics()
 
+    for model_name, model in multilabel_moe.items():
+        print "\nmodel {} \n ".format(model_name)
+        model._create_stat_model()
+        model.predict_model(use_stat_model=True)
+        model.print_stats()
 
 print "\n total avg performance: \n"
 for model in models.keys()+['avg']:
@@ -139,8 +144,3 @@ for model in models.keys()+['avg']:
         print "{} {}    {:.5f} (+/- {:.5f})".format(model, k, v['mean'], v['std'])
 
 
-for model_name,model in multilabel_moe.items():
-    print "\nmodel {} \n ".format(model_name)
-    model._create_stat_model()
-    model.predict_model(use_stat_model=True)
-    model.print_stats()

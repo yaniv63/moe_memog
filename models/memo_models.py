@@ -16,7 +16,16 @@ def expert_NN(name,params):
         Dense(1, activation="sigmoid", name='exp{}_output'.format(name), kernel_initializer=params['w_init']))
     return model
 
-
+def gate_model(params,expert_num,data):
+    gate_input = concatenate(data, axis=1)
+    gate_dense = Dense(params['nn_gate1'], activation='relu', name='dense1_gate',
+                       kernel_initializer=params['w_init'])(gate_input)
+    gate_dense2 = Dense(params['nn_gate2'], activation='relu', name='dense2_gate',
+                        kernel_initializer=params['w_init'])(gate_dense)
+    d2 = Dropout(rate=params['dropout2'])(gate_dense2)
+    coefficients = Dense(expert_num, activation='softmax', name='out_gate',
+                         kernel_initializer=params['w_init'])(d2)
+    return coefficients
 
 class BaseLineModel(MyModel):
 
@@ -29,6 +38,7 @@ class BaseLineModel(MyModel):
         model.add(Dropout(rate=params['dropout1']))
         model.add(Dense(params['nn_layer2'], kernel_initializer=params['w_init'], activation="relu"))
         model.add(Dropout(rate=params['dropout2']))
+        model.add(Dense(params['nn_layer3'], kernel_initializer=params['w_init'], activation="relu"))
         model.add(Dense(1, kernel_initializer=params['w_init'], activation="sigmoid"))
         return model
 
@@ -38,31 +48,33 @@ class ExpertModel(MyModel):
         super(ExpertModel,self).__init__(x_train, y_train, x_test, y_test, name,model_params, callback_params, fit_params,eval_m, save_path)
 
     def _create_model(self, params):
-        #model = expert_NN(self.name,params)
-        name = self.name
-        model = Sequential()
-        model.add(Dense(params['nn_layer1'], activation="relu", input_dim=14, name='exp{}_dense1'.format(name),
-                        kernel_initializer=params['w_init']))
-        model.add(Dropout(rate=params['dropout1']))
-        model.add(Dense(params['nn_layer2'], activation="relu", name='exp{}_dense2'.format(name),
-                        kernel_initializer=params['w_init']))
-        model.add(Dropout(rate=params['dropout2']))
-        model.add(
-            Dense(1, activation="sigmoid", name='exp{}_output'.format(name), kernel_initializer=params['w_init']))
+        model = expert_NN(self.name,params)
+        # name = self.name
+        # model = Sequential()
+        # model.add(Dense(params['nn_layer1'], activation="relu", input_dim=14, name='exp{}_dense1'.format(name),
+        #                 kernel_initializer=params['w_init']))
+        # model.add(Dropout(rate=params['dropout1']))
+        # model.add(Dense(params['nn_layer2'], activation="relu", name='exp{}_dense2'.format(name),
+        #                 kernel_initializer=params['w_init']))
+        # model.add(Dropout(rate=params['dropout2']))
+        # model.add(
+        #     Dense(1, activation="sigmoid", name='exp{}_output'.format(name), kernel_initializer=params['w_init']))
         return model
 
-        #return model
 
 
 class MOE(MyModel):
     def __init__(self, x_train, y_train, x_test, y_test, name, model_params, callback_params, fit_params, eval_m,
-                 save_path,expert_num):
+                 save_path,expert_num,experts):
         super(MOE, self).__init__(x_train, y_train, x_test, y_test, name, model_params, callback_params,
                                           fit_params, eval_m, save_path)
         self.expert_num = expert_num
         # split data for experts
         self.x_train = np.split(np.array(self.x_train),self.expert_num,1)
+        self.x_val = np.split(np.array(self.x_val),self.expert_num,1)
         self.x_test = np.split(np.array(self.x_test),self.expert_num,1)
+        self.experts = experts
+
 
     def _create_model(self,params):
         decisions = []
@@ -76,26 +88,25 @@ class MOE(MyModel):
 
         merged_decisions = concatenate(decisions, axis=1)
 
-        gate_input = concatenate(data, axis=1)
-        gate_dense = Dense(params['nn_gate1'], activation='relu', name='dense1_gate',
-                           kernel_initializer=params['w_init'])(gate_input)
-        gate_dense2 = Dense(params['nn_gate2'], activation='relu', name='dense2_gate',
-                            kernel_initializer=params['w_init'])(gate_dense)
-        d2 = Dropout(rate=params['dropout2'])(gate_dense2)
-        coefficients = Dense(self.expert_num, activation='softmax', name='out_gate',
-                             kernel_initializer=params['w_init'])(d2)
-
+        coefficients = gate_model(params,self.expert_num,data)
         weighted_prediction = dot([coefficients, merged_decisions], axes=1, name='main_output')
         model = Model(inputs=data, outputs=weighted_prediction)
         return model
+
+    def pretrain_model(self):
+        for expert in self.experts:
+            self.model.load_weights(expert.get_weights())
+        predicts = zip([expert.prediction for expert in self.experts])
+        gate_labels = [np.argmin(np.abs(np.array(predict)-label))  for predict,label in zip(predicts,self.check_labels)]
+        gate_model(self.model_params,self.expert_num,)
 
 
 class MultilabelMOE(MOE):
 
     def __init__(self, x_train, y_train, x_test, y_test, name, model_params, callback_params, fit_params, eval_m,
-                 save_path,expert_num):
+                 save_path,expert_num,experts = None):
         super(MultilabelMOE, self).__init__(x_train, y_train, x_test, y_test, name, model_params, callback_params,
-                                          fit_params, eval_m, save_path,expert_num)
+                                          fit_params, eval_m, save_path,expert_num,experts)
         self.y_train = [self.y_train]*(self.expert_num+1)
 
     def _create_model(self,params):
@@ -120,25 +131,26 @@ class MultilabelMOE(MOE):
         self.model.compile(optimizer=params['optimizer'], loss=params['loss'],
                            metrics=params['metrics'],loss_weights =params['loss_weights'])
 
-    def predict_model(self,use_stat_model=False):
+    def predict_model(self,use_stat_model=False,predict_val=False):
+        self.pred_data(predict_val)
         model = self.stat_model if use_stat_model else self.model
-        self.prediction = model.predict(self.x_test)
+        self.prediction = model.predict(self.check_sampels)
         self.hard_pred = {}
         for i,name in enumerate(['main'] + range(self.expert_num)):
             self.hard_pred[name] = np.round(self.prediction[i],0)
         self.prediction = zip(*self.prediction)
 
     def eval_model(self):
-        self.eval_results  = self.eval_m.eval(self.y_test,self.hard_pred['main'])
+        self.eval_results  = self.eval_m.eval(self.check_labels,self.hard_pred['main'])
         self.exp_results = {}
         for i in range(self.expert_num):
-            self.exp_results[i] = self.eval_m.eval(self.y_test,self.hard_pred[i])
+            self.exp_results[i] = self.eval_m.eval(self.check_labels,self.hard_pred[i])
 
     def print_stats(self):
         if self.prediction is not None:
             res = self.prediction
-            for j in range(len(self.y_test)):
-                print " sample {} target {} output {:.2f} exp1 {:.2f} exp2 {:.2f} gate {} ".format(j, self.y_test[j],
+            for j in range(len(self.check_labels)):
+                print " sample {} target {} output {:.2f} exp1 {:.2f} exp2 {:.2f} gate {} ".format(j, self.check_labels[j],
                                                                                                   float(res[j][0]),
                                                                                                   float(res[j][1]),
                                                                                                   float(res[j][2]),

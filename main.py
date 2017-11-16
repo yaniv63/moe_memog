@@ -23,12 +23,12 @@ concat_data = np.concatenate((data['CC'], data['MLO']), axis=1)
 nb_splits = 10
 kfold_params_dict = {'n_splits': nb_splits, 'shuffle': False, 'random_state': 42}
 fit_params_dict = {'batch_size': 16, 'epochs': 500, 'validation_split': 0.0, 'verbose': 0,
-                   'optimizer' : 'adam', 'loss' : 'binary_crossentropy', 'metrics' : ['accuracy']}
+                   'optimizer' : 'adam', 'loss' : 'binary_crossentropy', 'metrics' : ['accuracy'],'shuffle': False}
 expert_params = {  'nn_layer1' : 12, 'nn_layer2' : 12,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform' }
-baseline_params = {'nn_layer1' : 24, 'nn_layer2' : 24,
-                  'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform'}
-moe_params = { 'nn_layer1' : 24, 'nn_layer2' : 24,
+baseline_params = {'nn_layer1' : 27, 'nn_layer2' : 24,'nn_layer3' : 3,'nn_layer4' : 3,
+                  'dropout1' : 0.5,'dropout2': 0.5,'dropout3': 0.5,'w_init': 'glorot_uniform'}
+moe_params = { 'nn_layer1' : 12, 'nn_layer2' : 12,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform','nn_gate1' : 3,'nn_gate2':3}
 multi_moe_params =copy.copy(fit_params_dict)
 multi_moe_params['loss_weights'] = [1,1,1]
@@ -72,7 +72,7 @@ def avg_experts(models, model_names, nb_splits):
             preds.append(models[name][name+'_exp_fold_'+str(i)].prediction)
         avg_pred = np.mean(preds,axis=0)
         hard_pred = np.round(avg_pred,0)
-        res[i] = eval_m.eval(models[name][name+'_exp_fold_'+str(i)].y_test,hard_pred)
+        res[i] = eval_m.eval(models[name][name+'_exp_fold_'+str(i)].check_labels,hard_pred)
     return res
 
 def avg_total(results,metrics):
@@ -91,8 +91,8 @@ for view in data_view:
     experts[view] = view_exp
 
 basemodels = create_model_by_data(concat_data, target, BaseLineModel, "baseline", baseline_params, callbacks_params, fit_params_dict, eval_m, run_dir)
-moe_model = create_model_by_data(concat_data,target,MOE,"moe",moe_params,callbacks_params,fit_params_dict,eval_m,run_dir,{'expert_num':expert_num})
-multilabel_moe = create_model_by_data(concat_data,target,MultilabelMOE,"multilabel_moe",moe_params,callbacks_params,multi_moe_params,eval_m,run_dir,{'expert_num':expert_num})
+moe_model = create_model_by_data(concat_data,target,MOE,"moe",moe_params,callbacks_params,fit_params_dict,eval_m,run_dir,{'expert_num':expert_num,'experts':None})
+multilabel_moe = create_model_by_data(concat_data,target,MultilabelMOE,"multilabel_moe",moe_params,callbacks_params,multi_moe_params,eval_m,run_dir,{'expert_num':expert_num,'experts':None})
 models = {}
 models.update(experts)
 models["baseline"]=basemodels
@@ -119,8 +119,9 @@ for seed in range(init_seed,init_seed+seed_num):
         for model in m.values():
             model._reset()
             model.prepare_model(seed)
+ #           model.pretrain_model()
             model.fit_model()
-            model.predict_model()
+            model.predict_model(predict_val=False)
             model.eval_model()
             seed_results[model_type][model.name] = model.eval_results
 

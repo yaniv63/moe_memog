@@ -43,3 +43,6 @@ def scale_data_normlize(data):
         d = scaler.fit_transform(d)
         data[key] =d
     return data
+
+if __name__ == '__main__':
+    d,l = load_medical_data('Fatty')

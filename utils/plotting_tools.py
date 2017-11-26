@@ -37,17 +37,16 @@ def generic_plot(kwargs):
         plt.savefig(kwargs["save_file"],dpi=100)
 
 def plot_training(logs,name,save_path):
-    metrics = ['acc', 'val_acc', 'loss', 'val_loss']#, 'fmeasure', 'val_fmeasure']
+    metrics = ['loss', 'val_loss']#'acc', 'val_acc', , 'fmeasure', 'val_fmeasure']
     linestyles = ['-', '--']
     colors = ['b','y','r','g','c','m','k',[.80, .19, .46],[.61, .51, .74],[.31, .87, .56]]
-    for j,history in enumerate(logs):
-        for i in [0,2,4]:
-            params = {'figure_name': metrics[i]+name, 'y':history[metrics[i]],'title':'model_{} '.format(name) + metrics[i],
-                      'ylabel':metrics[i],'xlabel':'epoch',"line_att":dict(linestyle=linestyles[0],color=colors[j])}
-            generic_plot(params)
-            #params = {'figure_name': metrics[i]+name, 'y':history[metrics[i+1]],"line_att":dict(linestyle=linestyles[1],color=colors[j])}
-            #generic_plot(params)
-    for i in [0, 2, 4]:
+    for i in [0]:
+        params = {'figure_name': metrics[i]+name, 'y':logs[metrics[i]],'title':'model_{} '.format(name) + metrics[i],
+                  'ylabel':metrics[i],'xlabel':'epoch',"line_att":dict(linestyle=linestyles[0],color=colors[0])}
+        generic_plot(params)
+        params = {'figure_name': metrics[i]+name, 'y':logs[metrics[i+1]],"line_att":dict(linestyle=linestyles[1],color=colors[1])}
+        generic_plot(params)
+    for i in [0]:
         params = {'figure_name': metrics[i]+name,
                   'save_file': save_path + 'model_{}_'.format(name) + metrics[i] + '.png'}
         generic_plot(params)

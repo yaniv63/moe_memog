@@ -87,7 +87,7 @@ class MOE(MyModel):
         data = []
 
         for i in range(self.expert_num):
-            experts.append(expert_NN( str(i)+'_expert', params))
+            experts.append(expert_NN(i, params))
             data.append(experts[i].input)
             decisions.append(experts[i].output)
 
@@ -118,7 +118,6 @@ class MOE(MyModel):
             #filename = 'exp{}_pretrain'.format(name)
             #return expert.predict(data),expert.predict(val)
 
-            name =str(name) + '_expert'
             expert = ExpertModel(data,labels,val,val_l,name,self.model_params,self.callback_params,self.fit_params,self.eval_m,self.save_path)
             expert.prepare_model(self.seed)
             expert.fit_model()
@@ -169,7 +168,7 @@ class MOE(MyModel):
     def _add_experts_output(self, model):
         outputs = [model.output]
         for i in range(self.expert_num):
-            outputs.append(model.get_layer('exp{}_output'.format(str(i)+'_expert')).output)
+            outputs.append(model.get_layer('exp{}_output'.format(i)).output)
         multipredict_model = Model(
             inputs=model.inputs,
             outputs=outputs

@@ -32,7 +32,7 @@ expert_params = {  'nn_layer1' : 24, 'nn_layer2' : 12,
 baseline_params = {'nn_layer1' : 24, 'nn_layer2' : 24,'nn_layer3' : 3,'nn_layer4' : 3,
                   'dropout1' : 0.5,'dropout2': 0.5,'dropout3': 0.5,'w_init': 'glorot_uniform'}
 moe_params = { 'nn_layer1' : 22, 'nn_layer2' : 12,
-                  'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform','nn_gate1' : 20,'nn_gate2':20}
+                  'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform','nn_gate1' : 3,'nn_gate2':3}
 multi_moe_params =copy.copy(fit_params_dict)
 multi_moe_params['loss_weights'] = [1,1,1]
 
@@ -102,25 +102,25 @@ for view in data_view:
     view_exp = create_model_by_data(data[view],target,ExpertModel,"{}_exp".format(view),expert_params,callbacks_params,fit_params_dict,eval_m, run_dir)
     experts[view] = view_exp
 
-#basemodels = create_model_by_data(concat_data, target, BaseLineModel, "baseline", baseline_params, callbacks_params, fit_params_dict, eval_m, run_dir)
+basemodels = create_model_by_data(concat_data, target, BaseLineModel, "baseline", baseline_params, callbacks_params, fit_params_dict, eval_m, run_dir)
 moe_model = create_model_by_data(concat_data,target,MOE,"moe",moe_params,callbacks_params,fit_params_dict,eval_m,run_dir,{'expert_num':expert_num,'experts':None})
 # for i,model in enumerate(moe_model.values()):
 #     exp = [experts[view]["{}_exp_fold_{}".format(view,i)] for view in data_view]
 #     model.add_experts(exp)
 multilabel_moe = create_model_by_data(concat_data,target,MultilabelMOE,"multilabel_moe",moe_params,callbacks_params,multi_moe_params,eval_m,run_dir,{'expert_num':expert_num,'experts':None})
 models = {}
-#models.update(experts)
-#models["baseline"]=basemodels
+models.update(experts)
+models["baseline"]=basemodels
 models["moe"] = moe_model
-#models['multilabel'] = multilabel_moe
+models['multilabel'] = multilabel_moe
 
 
 ## plot handlers
 plot_handlers = {}
-plot_metrics  = ['loss']#,'acc']
-for model_name in ['moe']:#['CC','MLO','baseline','moe']:
+plot_metrics  = ['loss','acc']
+for model_name in ['CC','MLO','baseline','moe']:
     plot_handlers[model_name] = PlotHandler(models[model_name].values(), run_dir, plot_metrics)
-#plot_handlers['multilabel'] = PlotHandler(models['multilabel'].values(), run_dir, ['loss','main_output_acc','exp0_output_acc','exp1_output_acc'])
+plot_handlers['multilabel'] = PlotHandler(models['multilabel'].values(), run_dir, ['loss','main_output_acc','exp0_output_acc','exp1_output_acc'])
 
 ## train & eval
 
@@ -134,27 +134,27 @@ for seed in range(init_seed,init_seed+seed_num):
         for model in m.values():
             model._reset()
             model.prepare_model(seed)
-            model.pretrain_model()
+ #           model.pretrain_model()
             model.fit_model()
             model.predict_model()
             model.eval_model()
             seed_results[model_type][model.name] = model.eval_results
 
-    # seed_results['avg'] = avg_experts(experts, data_view, nb_splits)
-    for model in models.keys():#+['avg']:
+    seed_results['avg'] = avg_experts(experts, data_view, nb_splits)
+    for model in models.keys()+['avg']:
         avg = avg_result(seed_results[model], metrics)
         total_results[model].append(avg)
     for k,v in plot_handlers.items():
         plot_handlers[k].plot_metrics()
 
-    for model_name, model in moe_model.items():
+    for model_name, model in multilabel_moe.items():
         logger.info("\nmodel {} \n ".format(model_name))
         model._create_stat_model()
         model.predict_stats()
         model.print_stats()
 
 logger.info( "\n total avg performance: \n")
-for model in models.keys():#+['avg']:
+for model in models.keys()+['avg']:
     avg = avg_total(total_results[model], metrics)
     for k, v in avg.items():
         logger.info( "{} {}    {:.5f} (+/- {:.5f})".format(model, k, v['mean'], v['std']))

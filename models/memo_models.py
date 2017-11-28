@@ -131,8 +131,8 @@ class MultilabelMOE(MOE):
         self.model.compile(optimizer=params['optimizer'], loss=params['loss'],
                            metrics=params['metrics'],loss_weights =params['loss_weights'])
 
-    def predict_model(self,use_stat_model=False,predict_val=False):
-        self.pred_data(predict_val)
+    def predict_model(self,use_stat_model=False,predict_set='val'):
+        self.pred_data(predict_set)
         model = self.stat_model if use_stat_model else self.model
         self.prediction = model.predict(self.check_sampels)
         self.hard_pred = {}

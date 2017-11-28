@@ -24,11 +24,11 @@ nb_splits = 10
 kfold_params_dict = {'n_splits': nb_splits, 'shuffle': False, 'random_state': 42}
 fit_params_dict = {'batch_size': 16, 'epochs': 500, 'validation_split': 0.0, 'verbose': 0,
                    'optimizer' : 'adam', 'loss' : 'binary_crossentropy', 'metrics' : ['accuracy'],'shuffle': False}
-expert_params = {  'nn_layer1' : 12, 'nn_layer2' : 12,
+expert_params = {  'nn_layer1' : 24, 'nn_layer2' : 12,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform' }
 baseline_params = {'nn_layer1' : 27, 'nn_layer2' : 24,'nn_layer3' : 3,'nn_layer4' : 3,
                   'dropout1' : 0.5,'dropout2': 0.5,'dropout3': 0.5,'w_init': 'glorot_uniform'}
-moe_params = { 'nn_layer1' : 12, 'nn_layer2' : 12,
+moe_params = { 'nn_layer1' : 22, 'nn_layer2' : 12,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform','nn_gate1' : 3,'nn_gate2':3}
 multi_moe_params =copy.copy(fit_params_dict)
 multi_moe_params['loss_weights'] = [1,1,1]
@@ -121,7 +121,7 @@ for seed in range(init_seed,init_seed+seed_num):
             model.prepare_model(seed)
  #           model.pretrain_model()
             model.fit_model()
-            model.predict_model(predict_val=False)
+            model.predict_model(predict_set='test')
             model.eval_model()
             seed_results[model_type][model.name] = model.eval_results
 
@@ -135,7 +135,7 @@ for seed in range(init_seed,init_seed+seed_num):
     for model_name, model in multilabel_moe.items():
         print "\nmodel {} \n ".format(model_name)
         model._create_stat_model()
-        model.predict_model(use_stat_model=True)
+        model.predict_model(use_stat_model=True,predict_set='test')
         model.print_stats()
 
 print "\n total avg performance: \n"

@@ -2,7 +2,8 @@ import numpy as np
 from my_model import MyModel
 from keras.models import Sequential,Model
 from keras.layers import Dense,Dropout,concatenate,dot
-
+import logging
+logger = logging.getLogger('root')
 
 def expert_NN(name,params):
     model = Sequential()
@@ -38,7 +39,7 @@ class BaseLineModel(MyModel):
         model.add(Dropout(rate=params['dropout1']))
         model.add(Dense(params['nn_layer2'], kernel_initializer=params['w_init'], activation="relu"))
         model.add(Dropout(rate=params['dropout2']))
-        model.add(Dense(params['nn_layer3'], kernel_initializer=params['w_init'], activation="relu"))
+        #model.add(Dense(params['nn_layer3'], kernel_initializer=params['w_init'], activation="relu"))
         model.add(Dense(1, kernel_initializer=params['w_init'], activation="sigmoid"))
         return model
 
@@ -146,14 +147,15 @@ class MultilabelMOE(MOE):
         for i in range(self.expert_num):
             self.exp_results[i] = self.eval_m.eval(self.check_labels,self.hard_pred[i])
 
+
     def print_stats(self):
         if self.prediction is not None:
             res = self.prediction
             for j in range(len(self.check_labels)):
-                print " sample {} target {} output {:.2f} exp1 {:.2f} exp2 {:.2f} gate {} ".format(j, self.check_labels[j],
+                logger.info(" sample {} target {} output {:.2f} exp1 {:.2f} exp2 {:.2f} gate {} ".format(j, self.check_labels[j],
                                                                                                   float(res[j][0]),
                                                                                                   float(res[j][1]),
                                                                                                   float(res[j][2]),
-                                                                                                  res[j][3])
+                                                                                                  res[j][3]))
         else:
             raise Exception("need to predict before presenting")

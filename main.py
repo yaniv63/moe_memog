@@ -9,8 +9,10 @@ from eval_model import EvalModel
 from collections import defaultdict
 from sklearn.metrics import accuracy_score,f1_score
 from utils.plotting_tools import PlotHandler
-
+from utils.logging_tools import get_logger
 run_dir = get_run_dir()
+logger = get_logger(run_dir)
+
 ## data
 data_view = ['CC','MLO']
 
@@ -32,6 +34,15 @@ moe_params = { 'nn_layer1' : 22, 'nn_layer2' : 12,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform','nn_gate1' : 3,'nn_gate2':3}
 multi_moe_params =copy.copy(fit_params_dict)
 multi_moe_params['loss_weights'] = [1,1,1]
+
+
+logger.info("{}".format(fit_params_dict))
+logger.info("{}".format(callbacks_params))
+logger.info("expert params {}".format(expert_params))
+logger.info("baseline_params {}".format(baseline_params))
+logger.info("moe params {}".format(moe_params))
+logger.info("multilabel params {}".format(multi_moe_params))
+
 expert_num =2
 ## helping objects
 metrics = {'acc':accuracy_score,'f1':f1_score}
@@ -96,14 +107,14 @@ multilabel_moe = create_model_by_data(concat_data,target,MultilabelMOE,"multilab
 models = {}
 models.update(experts)
 models["baseline"]=basemodels
-models["moe"] = moe_model
+#models["moe"] = moe_model
 models['multilabel'] = multilabel_moe
 
 
 ## plot handlers
 plot_handlers = {}
 plot_metrics  = ['loss','acc']
-for model_name in ['CC','MLO','baseline','moe']:
+for model_name in ['CC','MLO','baseline']:#,'moe']:
     plot_handlers[model_name] = PlotHandler(models[model_name].values(), run_dir, plot_metrics)
 plot_handlers['multilabel'] = PlotHandler(models['multilabel'].values(), run_dir, ['loss','main_output_acc','exp0_output_acc','exp1_output_acc'])
 
@@ -113,7 +124,7 @@ seed_num = 7
 init_seed = 12
 total_results = defaultdict(list)
 for seed in range(init_seed,init_seed+seed_num):
-    print "\n seed {} \n".format(seed)
+    logger.info( "\n seed {} \n".format(seed))
     seed_results = defaultdict(dict)
     for model_type,m in models.items():
         for model in m.values():
@@ -133,15 +144,15 @@ for seed in range(init_seed,init_seed+seed_num):
         plot_handlers[k].plot_metrics()
 
     for model_name, model in multilabel_moe.items():
-        print "\nmodel {} \n ".format(model_name)
+        logger.info("\nmodel {} \n ".format(model_name))
         model._create_stat_model()
         model.predict_model(use_stat_model=True,predict_set='test')
         model.print_stats()
 
-print "\n total avg performance: \n"
+logger.info( "\n total avg performance: \n")
 for model in models.keys()+['avg']:
     avg = avg_total(total_results[model], metrics)
     for k, v in avg.items():
-        print "{} {}    {:.5f} (+/- {:.5f})".format(model, k, v['mean'], v['std'])
+        logger.info( "{} {}    {:.5f} (+/- {:.5f})".format(model, k, v['mean'], v['std']))
 
 

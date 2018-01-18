@@ -4,6 +4,9 @@ from keras.models import Sequential,Model
 from keras.layers import Dense,Dropout,concatenate,dot
 import logging
 logger = logging.getLogger('root')
+from sklearn.metrics import roc_curve
+from utils.params import mean_fpr
+
 
 def expert_NN(name,params):
     model = Sequential()
@@ -40,6 +43,7 @@ class BaseLineModel(MyModel):
         model.add(Dense(params['nn_layer2'], kernel_initializer=params['w_init'], activation="relu"))
         model.add(Dropout(rate=params['dropout2']))
         #model.add(Dense(params['nn_layer3'], kernel_initializer=params['w_init'], activation="relu"))
+        # model.add(Dropout(rate=params['dropout3']))
         model.add(Dense(1, kernel_initializer=params['w_init'], activation="sigmoid"))
         return model
 
@@ -140,6 +144,7 @@ class MultilabelMOE(MOE):
         for i,name in enumerate(['main'] + range(self.expert_num)):
             self.hard_pred[name] = np.round(self.prediction[i],0)
         self.prediction = zip(*self.prediction)
+        self.main_prediction = [p[0] for p in self.prediction]
 
     def eval_model(self):
         self.eval_results  = self.eval_m.eval(self.check_labels,self.hard_pred['main'])
@@ -159,3 +164,7 @@ class MultilabelMOE(MOE):
                                                                                                   res[j][3]))
         else:
             raise Exception("need to predict before presenting")
+
+    def calc_roc(self):
+        fpr,tpr,threshold = roc_curve(self.y_test,self.main_prediction)
+        self.interp_tpr = np.interp(mean_fpr,fpr,tpr)

@@ -3,11 +3,26 @@ import numpy as np
 from sklearn.utils import shuffle
 from sklearn.preprocessing import StandardScaler
 
-def load_medical_data(data_view='Dense', set_type ='Both'):
-    raw_data = loadmat('data/%s.mat' % data_view)
+
+
+def _load_view(view):
+    raw_data = loadmat('data/%s.mat' % view)
     dataCC = raw_data.get('featuresCC')
     dataMLO = raw_data.get('featuresMLO')
     target = raw_data.get('Labels').transpose()[0]
+    return dataCC,dataMLO,target
+
+def _load_all_views():
+    D_cc,D_MLO,D_t =_load_view('Dense')
+    F_cc,F_MLO,F_t = _load_view('Fatty')
+    cc = np.concatenate((D_cc,F_cc))
+    mlo = np.concatenate((D_MLO,F_MLO))
+    target = np.concatenate((D_t,F_t))
+    return cc,mlo,target
+
+
+def load_medical_data(data_view='Dense', set_type ='Both'):
+    dataCC, dataMLO, target = _load_all_views() if data_view=='all' else _load_view(data_view)
     dataCC, dataMLO, target = shuffle(dataCC,dataMLO,target,random_state=0)
     if set_type=='CC':
         data = {'CC': dataCC}

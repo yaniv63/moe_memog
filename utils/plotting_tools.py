@@ -1,7 +1,7 @@
 import numpy as np
 import itertools
 import matplotlib
-
+from utils.params import mean_fpr
 #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pylab import rcParams
@@ -52,6 +52,17 @@ def plot_training(logs,name,save_path):
                   'save_file': save_path + 'model_{}_'.format(name) + metrics[i] + '.png'}
         generic_plot(params)
     plt.close('all')
+
+
+def plot_roc(rocs, types):
+    for type in types:
+        plt.plot(mean_fpr, rocs[type], lw=2, alpha=.8, label=type)
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic ')
+    plt.legend(loc="lower right")
+    plt.savefig("roc_curve.png")
+
 
 
 class PlotHandler(object):

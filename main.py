@@ -1,14 +1,15 @@
 import  numpy as np
+import pickle
 from models.memo_models import BaseLineModel,ExpertModel,MOE,MultilabelMOE
 from load_data import  load_medical_data
 from sklearn.model_selection import KFold #TODO check if startified
-from utils.params import callbacks_params
+from utils.params import callbacks_params,mean_fpr
 from utils.paths import get_run_dir
 import copy
 from eval_model import EvalModel
 from collections import defaultdict
-from sklearn.metrics import accuracy_score,f1_score
-from utils.plotting_tools import PlotHandler
+from sklearn.metrics import accuracy_score,f1_score,roc_auc_score,precision_score,recall_score,roc_curve
+from utils.plotting_tools import PlotHandler,plot_roc
 from utils.logging_tools import get_logger
 run_dir = get_run_dir()
 logger = get_logger(run_dir)
@@ -16,26 +17,26 @@ logger = get_logger(run_dir)
 ## data
 data_view = ['CC','MLO']
 
-data_type = ['Dense','Fatty']
-type_v = 1
+data_type = ['Dense','Fatty','all']
+type_v = 0
 data,target = load_medical_data(data_type[type_v])
 concat_data = np.concatenate((data['CC'], data['MLO']), axis=1)
 
 ## params
 nb_splits = 10
 kfold_params_dict = {'n_splits': nb_splits, 'shuffle': False, 'random_state': 42}
-fit_params_dict = {'batch_size': 16, 'epochs': 500, 'validation_split': 0.0, 'verbose': 0,
+fit_params_dict = {'batch_size': 16, 'epochs':1, 'validation_split': 0.0, 'verbose': 0,
                    'optimizer' : 'adam', 'loss' : 'binary_crossentropy', 'metrics' : ['accuracy'],'shuffle': False}
 expert_params = {  'nn_layer1' : 24, 'nn_layer2' : 12,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform' }
-baseline_params = {'nn_layer1' : 27, 'nn_layer2' : 24,'nn_layer3' : 3,'nn_layer4' : 3,
+baseline_params = {'nn_layer1' : 24, 'nn_layer2' : 24,'nn_layer3' : 20,'nn_layer4' : 3,
                   'dropout1' : 0.5,'dropout2': 0.5,'dropout3': 0.5,'w_init': 'glorot_uniform'}
-moe_params = { 'nn_layer1' : 22, 'nn_layer2' : 12,
+moe_params = { 'nn_layer1' : 24, 'nn_layer2' : 24,
                   'dropout1' : 0.5,'dropout2': 0.5,'w_init': 'glorot_uniform','nn_gate1' : 3,'nn_gate2':3}
 multi_moe_params =copy.copy(fit_params_dict)
 multi_moe_params['loss_weights'] = [1,1,1]
 
-
+logger.info("data type {}".format(data_type[type_v]))
 logger.info("{}".format(fit_params_dict))
 logger.info("{}".format(callbacks_params))
 logger.info("expert params {}".format(expert_params))
@@ -45,7 +46,7 @@ logger.info("multilabel params {}".format(multi_moe_params))
 
 expert_num =2
 ## helping objects
-metrics = {'acc':accuracy_score,'f1':f1_score}
+metrics = {'acc':accuracy_score,'f1':f1_score,'auc':roc_auc_score,'precision':precision_score,'recall':recall_score}#'roc':roc_curve}
 eval_m = EvalModel(metrics)
 kf = KFold(**kfold_params_dict)
 
@@ -75,6 +76,12 @@ def avg_result(results,metrics):
         avg[metric] ={'mean':np.mean(res),'std':np.std(res)}
     return avg
 
+def aggregate_result(agg,results,metrics):
+    for metric in metrics.keys():
+        res = [d[metric] for d in results.values()]
+        agg[metric] =[a+b for a,b in zip(res,agg[metric])]
+    return agg
+
 def avg_experts(models, model_names, nb_splits):
     res = {}
     for i in range(nb_splits):
@@ -93,6 +100,64 @@ def avg_total(results,metrics):
         s = [run[metric]['std'] for run in results]
         res[metric] = {'mean':np.mean(m),'std':np.mean(s)}
     return res
+
+def avg_roc(models):
+    rocs = {}
+    for model_type,m in models.items():
+        cross_roc = []
+        for model in m.values():
+            cross_roc.append(model.interp_tpr)
+        rocs[model_type] =np.mean(np.vstack(cross_roc),0)
+    return rocs
+
+# def fold_roc(models):
+#     rocs = {}
+#     for model_type,m in models.items():
+#         cross_roc = []
+#         for model in m.values():
+#             cross_roc.append(model.interp_tpr)
+#         rocs[model_type] =np.mean(np.vstack(cross_roc),0)
+#     return rocs
+
+def aggragate_init(model_names,metrics,init_v,nb_folds):
+    agg = defaultdict(dict)
+    for model in model_names:
+        for metric in metrics:
+            agg[model][metric] = [init_v]*nb_folds
+    return agg
+
+def avg_seed_roc(types,rocs):
+    r = {}
+    for type in types:
+        roc_type = [roc[type] for roc in rocs]
+        r[type] = np.mean(np.vstack(roc_type),0)
+    return r
+
+def avg_exp_roc(models, model_names, nb_splits):
+    res = []
+    for i in range(nb_splits):
+        preds = []
+        for name in model_names:
+            preds.append(models[name][name+'_exp_fold_'+str(i)].prediction)
+        avg_pred = np.mean(preds,axis=0)
+        fpr, tpr, threshold = roc_curve(models[name][name+'_exp_fold_'+str(i)].y_test, avg_pred)
+        res.append( np.interp(mean_fpr, fpr, tpr))
+    return np.mean(np.vstack(res),0)
+
+def stat_test(models,types,metrics):
+    from scipy.stats import ttest_rel
+    metric = 'acc'
+    model = 'baseline'
+    a = models['multilabel'][metric]
+    b = models[model][metric]
+    print ttest_rel(a,b)
+
+def save_predictions(seed):
+    with open('./model_stats_dense_{}.h'.format(seed),'wb') as f:
+        preds = {}
+        for model_name,model in models['multilabel'].items():
+            preds[model_name] = [model.prediction,model.y_test]
+        pickle.dump(preds,f)
 
 ## create models
 
@@ -120,9 +185,11 @@ plot_handlers['multilabel'] = PlotHandler(models['multilabel'].values(), run_dir
 
 ## train & eval
 
+stat_seed = aggragate_init(models.keys()+['avg'],metrics.keys(),0,10)
 seed_num = 7
 init_seed = 12
 total_results = defaultdict(list)
+total_rocs = []
 for seed in range(init_seed,init_seed+seed_num):
     logger.info( "\n seed {} \n".format(seed))
     seed_results = defaultdict(dict)
@@ -133,13 +200,23 @@ for seed in range(init_seed,init_seed+seed_num):
  #           model.pretrain_model()
             model.fit_model()
             model.predict_model(predict_set='test')
+            model.calc_roc()
             model.eval_model()
             seed_results[model_type][model.name] = model.eval_results
 
     seed_results['avg'] = avg_experts(experts, data_view, nb_splits)
+    avg_model_roc = avg_exp_roc(experts, data_view, nb_splits)
+    models_roc = avg_roc(models)
+    models_roc['avg'] = avg_model_roc
+
+    total_rocs.append( models_roc)
     for model in models.keys()+['avg']:
         avg = avg_result(seed_results[model], metrics)
         total_results[model].append(avg)
+        stat_seed[model] = aggregate_result(stat_seed[model],seed_results[model], metrics)
+
+    # stat_test(stat_seed,models.keys()+['avg'],metrics)
+
     for k,v in plot_handlers.items():
         plot_handlers[k].plot_metrics()
 
@@ -148,11 +225,18 @@ for seed in range(init_seed,init_seed+seed_num):
         model._create_stat_model()
         model.predict_model(use_stat_model=True,predict_set='test')
         model.print_stats()
+    save_predictions(seed)
+
 
 logger.info( "\n total avg performance: \n")
 for model in models.keys()+['avg']:
     avg = avg_total(total_results[model], metrics)
     for k, v in avg.items():
         logger.info( "{} {}    {:.5f} (+/- {:.5f})".format(model, k, v['mean'], v['std']))
+
+
+rocs = avg_seed_roc(models.keys()+['avg'],total_rocs)
+plot_roc(rocs,models.keys()+['avg'])
+stat_test(stat_seed,models.keys()+['avg'],metrics.keys())
 
 

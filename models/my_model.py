@@ -1,6 +1,8 @@
 import numpy as np
 from keras.callbacks import ModelCheckpoint,EarlyStopping,ReduceLROnPlateau,TensorBoard
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_curve
+from utils.params import mean_fpr
 
 class MyModel(object):
     def load_weights(self, w,byname=False):
@@ -110,3 +112,7 @@ class MyModel(object):
 
     def pretrain_model(self):
         pass
+
+    def calc_roc(self):
+        fpr,tpr,threshold = roc_curve(self.y_test,self.prediction)
+        self.interp_tpr = np.interp(mean_fpr,fpr,tpr)

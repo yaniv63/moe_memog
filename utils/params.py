@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 logger = logging.getLogger('root')
 
 callbacks_params = {'earlystop':{'patience':50,'monitor':'loss','mode':'min'},
@@ -17,3 +18,4 @@ params = {
     'nn_gate' : [3,6]
 }
 
+mean_fpr = np.linspace(0, 1, 40)

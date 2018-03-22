@@ -36,8 +36,6 @@ def gate_attention(params):
     att_input = Input(shape=(14,))
     dense1 = Dense(15, name='dense1_gate', kernel_regularizer="l2", input_shape=(14,))(att_input)
     relu1 = LeakyReLU()(dense1)
-    # dense3 = Dense(3, name='dense3_gate', kernel_regularizer="l2")(relu1)
-    # relu2 = LeakyReLU()(dense3)
     dense2 = Dense(1, name='dense2_gate', kernel_regularizer="l2")(relu1)
     att_module = Model(att_input, dense2, name="attention_out")
     return att_module
@@ -53,8 +51,6 @@ class BaseLineModel(MyModel):
         model.add(Dropout(rate=params['dropout1']))
         model.add(Dense(params['nn_layer2'], kernel_initializer=params['w_init'], activation="relu"))
         model.add(Dropout(rate=params['dropout2']))
-        #model.add(Dense(params['nn_layer3'], kernel_initializer=params['w_init'], activation="relu"))
-        # model.add(Dropout(rate=params['dropout3']))
         model.add(Dense(1, kernel_initializer=params['w_init'], activation="sigmoid"))
         return model
 
@@ -199,8 +195,6 @@ class W_AVG(MyModel):
 
         merged_decisions = concatenate(decisions, axis=1)
 
-        # coefficients = gate_model(params,self.expert_num,data)
-        # weighted_prediction = dot([coefficients, merged_decisions], axes=1, name='main_output')
         o = Dense(1,activation="sigmoid",kernel_initializer='ones',bias_initializer=constant(-1))(merged_decisions)
         model = Model(inputs=data, outputs=o)
         return model

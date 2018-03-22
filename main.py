@@ -1,5 +1,4 @@
 import  numpy as np
-import pickle
 from models.memo_models import BaseLineModel,ExpertModel,MOE,MultilabelMOE
 from load_data import  load_medical_data
 from sklearn.model_selection import KFold
@@ -105,67 +104,7 @@ def avg_total(results,metrics):
         res[metric] = {'mean':np.mean(m),'std':np.mean(s)}
     return res
 
-def avg_roc(models):
-    rocs = {}
-    for model_type,m in models.items():
-        cross_roc = []
-        for model in m.values():
-            cross_roc.append(model.interp_tpr)
-        rocs[model_type] =np.mean(np.vstack(cross_roc),0)
-    return rocs
 
-# def fold_roc(models):
-#     rocs = {}
-#     for model_type,m in models.items():
-#         cross_roc = []
-#         for model in m.values():
-#             cross_roc.append(model.interp_tpr)
-#         rocs[model_type] =np.mean(np.vstack(cross_roc),0)
-#     return rocs
-
-def aggragate_init(model_names,metrics,init_v,nb_folds):
-    agg = defaultdict(dict)
-    for model in model_names:
-        for metric in metrics:
-            agg[model][metric] = [init_v]*nb_folds
-    return agg
-
-def avg_seed_roc(types,rocs):
-    r = {}
-    for type in types:
-        roc_type = [roc[type] for roc in rocs]
-        r[type] = np.mean(np.vstack(roc_type),0)
-    return r
-
-def avg_exp_roc(models, model_names, nb_splits):
-    res = []
-    for i in range(nb_splits):
-        preds = []
-        for name in model_names:
-            preds.append(models[name][name+'_exp_fold_'+str(i)].prediction)
-        avg_pred = np.mean(preds,axis=0)
-        fpr, tpr, threshold = roc_curve(models[name][name+'_exp_fold_'+str(i)].y_test, avg_pred)
-        res.append( np.interp(mean_fpr, fpr, tpr))
-    return np.mean(np.vstack(res),0)
-
-def stat_test(models,types,metrics):
-    from scipy.stats import ttest_rel
-    metric = 'acc'
-    model = 'baseline'
-    a = models['multilabel'][metric]
-    b = models[model][metric]
-    print ttest_rel(a,b)
-
-def save_predictions(seed,models,avg_stats):
-    with open('./model_stats_dense_{}.h'.format(seed),'wb') as f:
-        preds = {}
-        for model_type, m in models.items():
-            model_preds = {}
-            for model_name,model in m.items():
-                model_preds[model_name] = [model.prediction,model.y_test]
-            preds[model_type] = model_preds
-        preds['avg'] = avg_stats
-        pickle.dump(preds,f)
 
 ## create models
 
@@ -181,20 +120,19 @@ multilabel_moe = create_model_by_data(concat_data,target,MultilabelMOE,"multilab
 models = {}
 models.update(experts)
 models["baseline"]=basemodels
-#models["moe"] = moe_model
+models["moe"] = moe_model
 models['multilabel'] = multilabel_moe
 
 
 ## plot handlers
 plot_handlers = {}
 plot_metrics  = ['loss','acc']
-for model_name in ['CC','MLO','baseline']:#,'moe']:
+for model_name in ['CC','MLO','baseline','moe']:
     plot_handlers[model_name] = PlotHandler(models[model_name].values(), run_dir, plot_metrics)
 plot_handlers['multilabel'] = PlotHandler(models['multilabel'].values(), run_dir, ['loss','main_output_acc','exp0_output_acc','exp1_output_acc'])
 
 ## train & eval
 
-stat_seed = aggragate_init(models.keys()+['avg'],metrics.keys(),0,10)
 seed_num = 7
 init_seed = 12
 total_results = defaultdict(list)
@@ -206,7 +144,6 @@ for seed in range(init_seed,init_seed+seed_num):
         for model in m.values():
             model._reset()
             model.prepare_model(seed)
- #           model.pretrain_model()
             model.fit_model()
             model.predict_model(predict_set='test')
             model.calc_roc()
@@ -214,17 +151,12 @@ for seed in range(init_seed,init_seed+seed_num):
             seed_results[model_type][model.name] = model.eval_results
 
     seed_results['avg'],avg_stats = avg_experts(experts, data_view, nb_splits)
-    avg_model_roc = avg_exp_roc(experts, data_view, nb_splits)
-    models_roc = avg_roc(models)
-    models_roc['avg'] = avg_model_roc
 
-    total_rocs.append( models_roc)
+
     for model in models.keys()+['avg']:
         avg = avg_result(seed_results[model], metrics)
         total_results[model].append(avg)
-        stat_seed[model] = aggregate_result(stat_seed[model],seed_results[model], metrics)
 
-    # stat_test(stat_seed,models.keys()+['avg'],metrics)
 
     for k,v in plot_handlers.items():
         plot_handlers[k].plot_metrics()
@@ -234,7 +166,6 @@ for seed in range(init_seed,init_seed+seed_num):
         model._create_stat_model()
         model.predict_model(use_stat_model=True,predict_set='test')
         model.print_stats()
-    save_predictions(seed,models,avg_stats)
 
 
 logger.info( "\n total avg performance: \n")
@@ -244,10 +175,5 @@ for model in models.keys()+['avg']:
         logger.info( "{} {}    {:.5f} (+/- {:.5f})".format(model, k, v['mean'], v['std']))
 
 
-rocs = avg_seed_roc(models.keys()+['avg'],total_rocs)
-with open("roc_data.h","wb") as f:
-    pickle.dump(rocs,f)
-# plot_roc(rocs,models.keys()+['avg'])
-# stat_test(stat_seed,models.keys()+['avg'],metrics.keys())
-#
+
 

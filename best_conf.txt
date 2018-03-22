@@ -1,6 +1,0 @@
- {'optimizer': 'sgd', 'nn_gate': 6, 'w_init': 'glorot_uniform', 'nn_layer2': 10, 'nn_layer1': 6, 'epoch_num': 100, 'dropout2': 0, 'dropout1': 0.2} 0.746
-{'optimizer': 'sgd', 'nn_gate': 6, 'w_init': 'glorot_uniform', 'nn_layer2': 15, 'nn_layer1': 15, 'epoch_num': 500, 'dropout2': 0.5, 'dropout1': 0.2} 0.746
-{'optimizer': 'sgd', 'nn_gate': 6, 'w_init': 'glorot_uniform', 'nn_layer2': 24, 'nn_layer1': 6, 'epoch_num': 500, 'dropout2': 0.5, 'dropout1': 0} 0.746
-{'optimizer': 'sgd', 'nn_gate': 3, 'w_init': 'glorot_uniform', 'nn_layer2': 10, 'nn_layer1': 6, 'epoch_num': 500, 'dropout2': 0, 'dropout1': 0}
-{'optimizer': 'sgd', 'nn_gate': 3, 'w_init': 'glorot_normal', 'nn_layer2': 15, 'nn_layer1': 10, 'epoch_num': 500, 'dropout2': 0, 'dropout1': 0.2}
-{'optimizer': 'adam', 'nn_gate': 6, 'w_init': 'glorot_uniform', 'nn_layer2': 24, 'nn_layer1': 10, 'epoch_num': 500, 'dropout2': 0.2, 'dropout1': 0.5}

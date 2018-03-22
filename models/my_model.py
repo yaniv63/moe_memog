@@ -21,7 +21,6 @@ class MyModel(object):
             train_test_split(x_train,y_train,shuffle=False,random_state=0,test_size=fit_params['validation_split'])
         self.y_test = y_test
         self.x_test = x_test
-        #self.y_train = y_train
         self.save_path = save_path
         self.model_params = model_params
         self.fit_params = fit_params
@@ -45,7 +44,7 @@ class MyModel(object):
     def _fit_phase(self,params):
         self.history = self.model.fit(self.x_train, self.y_train, callbacks=self.callbacks,
                        batch_size=params['batch_size'], epochs=params['epochs'],
-                       verbose=params['verbose'])#,shuffle = params['shuffle'])
+                       verbose=params['verbose'])
 
     def pred_data(self,set='val'):
 
@@ -62,7 +61,6 @@ class MyModel(object):
 
 
     def predict_model(self, predict_set='val'):
-        #self.load_weights(self.w_path,byname=False)
         self.pred_data(predict_set)
         self.prediction = self.model.predict(self.check_sampels)
         self.hard_pred = np.round(self.prediction,0)
@@ -79,7 +77,6 @@ class MyModel(object):
             model_params = self.model_params
         if callback_params is None:
             callback_params = self.callback_params
-        #callback_params['name'] = callback_params['model_type'] + '_seed_' + str(seed)
         self.seed = seed
         np.random.seed(seed)
         self.model = self._create_model(model_params)
@@ -102,7 +99,6 @@ class MyModel(object):
         early_stop = EarlyStopping(**params['earlystop'])
 
         reduce_lr = ReduceLROnPlateau(**params['ReduceLROnPlateau'])
-        #plot = TensorBoard(log_dir=self.save_path)
         mycallbacks = [save_weights, early_stop, reduce_lr]
 
         return mycallbacks

@@ -1,7 +1,8 @@
 import numpy as np
 from my_model import MyModel
 from keras.models import Sequential,Model
-from keras.layers import Dense,Dropout,concatenate,dot
+from keras.layers import Dense,Dropout,concatenate,dot,LeakyReLU,Input,Activation
+from keras.initializers import constant
 import logging
 logger = logging.getLogger('root')
 from sklearn.metrics import roc_curve
@@ -31,6 +32,16 @@ def gate_model(params,expert_num,data):
                          kernel_initializer=params['w_init'])(d2)
     return coefficients
 
+def gate_attention(params):
+    att_input = Input(shape=(14,))
+    dense1 = Dense(15, name='dense1_gate', kernel_regularizer="l2", input_shape=(14,))(att_input)
+    relu1 = LeakyReLU()(dense1)
+    # dense3 = Dense(3, name='dense3_gate', kernel_regularizer="l2")(relu1)
+    # relu2 = LeakyReLU()(dense3)
+    dense2 = Dense(1, name='dense2_gate', kernel_regularizer="l2")(relu1)
+    att_module = Model(att_input, dense2, name="attention_out")
+    return att_module
+
 class BaseLineModel(MyModel):
 
     def __init__(self,x_train, y_train, x_test, y_test, name,model_params, callback_params, fit_params,eval_m, save_path):
@@ -54,16 +65,6 @@ class ExpertModel(MyModel):
 
     def _create_model(self, params):
         model = expert_NN(self.name,params)
-        # name = self.name
-        # model = Sequential()
-        # model.add(Dense(params['nn_layer1'], activation="relu", input_dim=14, name='exp{}_dense1'.format(name),
-        #                 kernel_initializer=params['w_init']))
-        # model.add(Dropout(rate=params['dropout1']))
-        # model.add(Dense(params['nn_layer2'], activation="relu", name='exp{}_dense2'.format(name),
-        #                 kernel_initializer=params['w_init']))
-        # model.add(Dropout(rate=params['dropout2']))
-        # model.add(
-        #     Dense(1, activation="sigmoid", name='exp{}_output'.format(name), kernel_initializer=params['w_init']))
         return model
 
 
@@ -168,3 +169,76 @@ class MultilabelMOE(MOE):
     def calc_roc(self):
         fpr,tpr,threshold = roc_curve(self.y_test,self.main_prediction)
         self.interp_tpr = np.interp(mean_fpr,fpr,tpr)
+
+
+
+class W_AVG(MyModel):
+    def __init__(self, x_train, y_train, x_test, y_test, name, model_params, callback_params, fit_params, eval_m,
+                 save_path,expert_num,experts):
+        super(W_AVG, self).__init__(x_train, y_train, x_test, y_test, name, model_params, callback_params,
+                                          fit_params, eval_m, save_path)
+        self.expert_num = expert_num
+        # split data for experts
+        self.x_train = np.split(np.array(self.x_train),self.expert_num,1)
+        self.x_val = np.split(np.array(self.x_val),self.expert_num,1)
+        self.x_test = np.split(np.array(self.x_test),self.expert_num,1)
+        self.experts = experts
+
+
+    def _create_model(self,params):
+        init_bias = np.full(shape=(1,), fill_value=-1)
+        init_weights = np.ones((2, 1))
+        decisions = []
+        experts = []
+        data = []
+
+        for i in range(self.expert_num):
+            experts.append(expert_NN( i, params))
+            data.append(experts[i].input)
+            decisions.append(experts[i].output)
+
+        merged_decisions = concatenate(decisions, axis=1)
+
+        # coefficients = gate_model(params,self.expert_num,data)
+        # weighted_prediction = dot([coefficients, merged_decisions], axes=1, name='main_output')
+        o = Dense(1,activation="sigmoid",kernel_initializer='ones',bias_initializer=constant(-1))(merged_decisions)
+        model = Model(inputs=data, outputs=o)
+        return model
+
+
+class MOE_attention(MultilabelMOE):
+    def __init__(self, x_train, y_train, x_test, y_test, name, model_params, callback_params, fit_params, eval_m,
+                 save_path,expert_num):
+        super(MOE_attention, self).__init__(x_train, y_train, x_test, y_test, name, model_params, callback_params, fit_params, eval_m,
+                 save_path,expert_num)
+
+    def _create_model(self,params):
+
+        decisions = []
+        experts = []
+        data = []
+        attention_w=[]
+        for i in range(self.expert_num):
+            experts.append(expert_NN(i, params))
+            data.append(experts[i].input)
+            decisions.append(experts[i].output)
+
+        merged_decisions = concatenate(decisions, axis=1)
+        att_module = gate_attention(params)
+        for i in range(self.expert_num):
+            att_o = att_module(data[i])
+            attention_w.append(att_o)
+        merged_attention = concatenate(inputs=attention_w, axis=1)
+        coefficients = Activation('softmax', name='att_coef')(merged_attention)
+
+        weighted_prediction = dot([coefficients, merged_decisions], axes=1, name='main_output')
+        model = Model(inputs=data, outputs=weighted_prediction)
+
+        outputs = [model.output]
+        for i in range(self.expert_num):
+            outputs.append(model.get_layer('exp{}_output'.format(i)).output)
+        multilabel = Model(
+            inputs=model.inputs,
+            outputs=outputs
+        )
+        return multilabel
